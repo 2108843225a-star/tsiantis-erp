@@ -2,7 +2,7 @@
   "name": "tsiantis-erp",
   "version": "0.1.0",
   "private": true,
-  "description": "TSIANTIS ERP multi-user PWA with embedded Claude AI for WINDOWS-MARKT",
+  "description": "ΤΣΙΑΝΤΗΣ ERP — multi-user PWA + ενσωματωμένο Claude AI, για τη WINDOWS-MARKT",
   "type": "module",
   "scripts": {
     "test": "node --experimental-strip-types --test tests/*.test.ts",
@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "postinstall": "prisma generate"
   },
   "engines": {
     "node": ">=22.6.0"
