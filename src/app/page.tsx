@@ -21,12 +21,30 @@ export default function HomePage() {
   return (
     <main style={{ maxWidth: 720, margin: "0 auto", padding: "32px 20px" }}>
       <header style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, margin: 0 }}>TSIANTIS ERP</h1>
+        <h1 style={{ fontSize: 26, margin: 0 }}>ΤΣΙΑΝΤΗΣ ERP</h1>
         <p style={{ color: "#57606a", marginTop: 4 }}>
-          WINDOWS-MARKT — the system is live. Management screens (projects,
-          customers, quotes) come in the next stage.
+          WINDOWS-MARKT — το σύστημα είναι live. Οι υπόλοιπες οθόνες
+          διαχείρισης (έργα, προσφορές) έρχονται στο επόμενο στάδιο.
         </p>
       </header>
+
+      <section style={{ marginBottom: 28 }}>
+        <a
+          href="/customers"
+          style={{
+            display: "inline-block",
+            background: "#1a7f37",
+            color: "#fff",
+            padding: "10px 16px",
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          Άνοιγμα: Πελάτες →
+        </a>
+      </section>
 
       <section
         style={{
@@ -72,7 +90,7 @@ export default function HomePage() {
         }}
       >
         <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>
-          Active cutting/glass rules ({activeRules.length})
+          Ενεργοί κανόνες κοπής/τζαμιού ({activeRules.length})
         </h2>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, lineHeight: 1.7 }}>
           {activeRules.map((r) => (
@@ -91,7 +109,7 @@ export default function HomePage() {
           padding: "16px 20px",
         }}
       >
-        <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>User roles</h2>
+        <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>Ρόλοι χρηστών</h2>
         <p style={{ fontSize: 13.5, color: "#57606a", margin: 0 }}>
           {roles.join(" · ")}
         </p>
