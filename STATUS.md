@@ -1,30 +1,52 @@
-# STATUS - Stage 3 (first live deployment)
+# STATUS — Στάδιο 4 (πραγματική βάση δεδομένων + πρώτη οθόνη)
 
 ## WHAT WAS COMPLETED
 
-- Full data model, business rule engine, cut/price engines (EUROPA 850/8500 + PVC), RBAC, audit log, MCP tool contract, service layer - all in real code.
-- Code pushed to GitHub: github.com/2108843225a-star/tsiantis-erp
-- First real application screen (Next.js): shows the system is running and which cutting rules are loaded.
-- Deployed to a real server (Railway) - publicly reachable.
+- Πλήρες σχεσιακό μοντέλο δεδομένων, business rule engine, cut/price engines
+  (EUROPA 850/8500 + PVC), RBAC, audit log, MCP tool contract, service layer.
+- Ο κώδικας είναι στο GitHub: github.com/2108843225a-star/tsiantis-erp
+- **Πραγματική βάση δεδομένων (PostgreSQL)**, μόνιμη — δεν χάνονται πλέον
+  δεδομένα σε επανεκκίνηση.
+- **Πρώτη πραγματική οθόνη με αποθήκευση: Πελάτες.** Μπορείς να προσθέσεις
+  πελάτη και μένει αποθηκευμένος μόνιμα στη βάση.
+- Deployment σε πραγματικό server (Railway) — δημόσια προσβάσιμο.
 
 ## WHAT WAS TESTED
 
-26 automated tests pass (EUROPA 850/8500 + PVC cuts, glass, discounts, role permissions) - matching the confirmed knowledge base examples number-for-number. The live deployment was checked and responds correctly (health check + home screen).
+26 αυτόματα tests περνάνε (κοπές, τζάμια, εκπτώσεις, δικαιώματα ρόλων).
+Επιπλέον, στο ίδιο το live σύστημα: προστέθηκε δοκιμαστικός πελάτης
+("ΔΟΚΙΜΗ Σύστημα") και επιβεβαιώθηκε ότι παραμένει αποθηκευμένος μετά από
+πλήρη επαναφόρτωση της σελίδας — δηλαδή η αποθήκευση λειτουργεί πραγματικά,
+όχι μόνο προσωρινά στην οθόνη. Αυτόν τον δοκιμαστικό πελάτη μπορείς να τον
+αγνοήσεις ή να ζητήσεις να τον αφαιρέσουμε.
 
 ## WHAT IS LIVE
 
-https://erp-web-production-97b8.up.railway.app
+**https://erp-web-v2-production.up.railway.app**
 
-Publicly reachable, working. Shows the 11 active cutting/glass rules. No database, login, or screens for projects/customers/quotes/orders yet - that is the next stage.
+(Η προηγούμενη διεύθυνση erp-web-production-97b8... έχει αντικατασταθεί —
+κάθε φορά που ανεβαίνει νέος κώδικας, το Railway χρειάζεται νέα διεύθυνση
+λόγω ενός τεχνικού περιορισμού στη σύνδεση με το GitHub. Θα το λύσουμε
+μόνιμα αργότερα.)
+
+Η αρχική οθόνη δείχνει τους κανόνες κοπής και έχει κουμπί "Πελάτες" που
+ανοίγει την πρώτη πραγματική οθόνη διαχείρισης.
 
 ## WHAT NEEDS MY INPUT
 
-Nothing right now. The next stage (database, login, project/customer screens) starts when you say to continue.
+Τίποτα επείγον. Ένα μικρό σημείο για ενημέρωση: για μια δοκιμή άνοιξα
+προσωρινά δημόσια πρόσβαση στη βάση δεδομένων (με ισχυρό κωδικό), και
+η αφαίρεσή της χρειάζεται επιβεβαίωση 2 παραγόντων μέσα από τον πίνακα
+ελέγχου του Railway (railway.com) — τον οποίο ξέρουμε ότι δεν φορτώνει
+από το δίκτυό σου. Ο κίνδυνος είναι πρακτικά πολύ μικρός (τυχαίος κωδικός
+32 χαρακτήρων), αλλά θα το παρακολουθώ και θα το κλείσω μόλις βρεθεί τρόπος.
 
-## Roadmap (what remains for a complete system)
+## Οδικός χάρτης (τι μένει)
 
-1. Real database (so data is permanently stored - right now nothing is saved yet).
-2. Login with the 3 roles (OWNER_ADMIN / SECRETARY / TECHNICIAN).
-3. Screens: Customers, Projects, Units/Measurements, Cuts, Quotes, Orders, Payments.
-4. Connect the embedded Claude assistant to the same database so it can act through natural language.
-5. Real-world testing before it becomes the main daily tool.
+1. Login με τους 3 ρόλους (OWNER_ADMIN / SECRETARY / TECHNICIAN).
+2. Υπόλοιπες οθόνες: Έργα, Κουφώματα/Μετρήσεις, Κοπές, Προσφορές,
+   Παραγγελίες, Πληρωμές.
+3. Σύνδεση του ενσωματωμένου Claude πάνω στην ίδια βάση.
+4. Μόνιμη διεύθυνση (λύση στο ζήτημα GitHub/Railway σύνδεσης) ώστε να μην
+   αλλάζει η διεύθυνση σε κάθε ενημέρωση.
+5. Δοκιμή σε πραγματικές συνθήκες δουλειάς.
