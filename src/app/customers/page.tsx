@@ -1,12 +1,16 @@
 import { prisma } from "@/lib/db";
 import { createCustomer } from "./actions";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { can } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 
 export default async function CustomersPage() {
+  const session = await getCurrentUser();
   const customers = await prisma.customer.findMany({
     orderBy: { createdAt: "desc" },
   });
+  const canWrite = session ? can(session.role, "customers.write") : false;
 
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px" }}>
@@ -19,28 +23,30 @@ export default async function CustomersPage() {
         μένει αποθηκευμένο στη βάση δεδομένων.
       </p>
 
-      <form
-        action={createCustomer}
-        style={{
-          background: "#fff",
-          border: "1px solid #d0d7de",
-          borderRadius: 8,
-          padding: 16,
-          marginBottom: 24,
-          display: "grid",
-          gap: 10,
-        }}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <input name="firstName" placeholder="Όνομα" required style={inputStyle} />
-          <input name="lastName" placeholder="Επώνυμο" required style={inputStyle} />
-        </div>
-        <input name="phone" placeholder="Τηλέφωνο" style={inputStyle} />
-        <input name="location" placeholder="Τοποθεσία" style={inputStyle} />
-        <button type="submit" style={buttonStyle}>
-          Προσθήκη πελάτη
-        </button>
-      </form>
+      {canWrite && (
+        <form
+          action={createCustomer}
+          style={{
+            background: "#fff",
+            border: "1px solid #d0d7de",
+            borderRadius: 8,
+            padding: 16,
+            marginBottom: 24,
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <input name="firstName" placeholder="Όνομα" required style={inputStyle} />
+            <input name="lastName" placeholder="Επώνυμο" required style={inputStyle} />
+          </div>
+          <input name="phone" placeholder="Τηλέφωνο" style={inputStyle} />
+          <input name="location" placeholder="Τοποθεσία" style={inputStyle} />
+          <button type="submit" style={buttonStyle}>
+            Προσθήκη πελάτη
+          </button>
+        </form>
+      )}
 
       <div style={{ display: "grid", gap: 8 }}>
         {customers.length === 0 && (
