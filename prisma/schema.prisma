@@ -36,6 +36,376 @@ model User {
   name               String
   role               Role
   active             Boolean   @default(true)
+  passwordHash       String    // scrypt "salt:hash" — βλ. src/lib/auth/password.ts
+  permissionOverrides Json?    // { grant: string[], revoke: string[] } — βλ. src/lib/rbac/roles.ts
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  quotesCreated      Quote[]        @relation("QuoteCreatedBy")
+  ordersCreated      Order[]        @relation("OrderCreatedBy")
+  paymentsRecorded   Payment[]      @relation("PaymentRecordedBy")
+  serviceAssigned    ServiceTicket[] @relation("ServiceAssignedTo")
+  auditEntries       AuditLog[]     @relation("AuditActorUser")
+}
+
+// ---------- Πελάτες / Έργα ----------
+
+model Customer {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  phone     String?
+  email     String?
+  location  String?
+  notes     String?
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects  Project[]
+
+  @@index([lastName])
+  @@index([phone])
+}
+
+enum ProjectStatus {
+  ΝΕΟ
+  ΜΕΤΡΗΣΗ
+  ΚΟΣΤΟΛΟΓΗΣΗ
+  ΠΡΟΣΦΟΡΑ
+  ΑΠΟΔΟΧΗ
+  ΠΑΡΑΓΓΕΛΙΑ
+  ΠΑΡΑΓΩΓΗ
+  ΤΟΠΟΘΕΤΗΣΗ
+  ΚΛΕΙΣΜΕΝΟ
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  code           String        @unique // π.χ. "2026-0142"
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  location       String?
+  status         ProjectStatus @default(ΝΕΟ)
+  agreedAmount   Decimal?      @db.Decimal(10, 2)
+  installationDate DateTime?
+  notes          String?
+  version        Int           @default(1)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  openings       Opening[]
+  quotes         Quote[]
+  orders         Order[]
+  payments       Payment[]
+  documents      ProjectDocument[]
+  serviceTickets ServiceTicket[]
+
+  @@index([status])
+  @@index([code])
+}
+
+// ---------- Κουφώματα / Μετρήσεις / Κοπές ----------
+
+enum WindowSystem {
+  EUROPA_850
+  EUROPA_8500
+  PVC
+  OTHER_UNCONFIRMED // σειρά χωρίς CONFIRMED κανόνα — αποθηκεύεται, ΔΕΝ υπολογίζεται
+}
+
+model Opening {
+  id            String       @id @default(cuid())
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id])
+  unitCode      String       // Κ01, Κ02, ...
+  system        WindowSystem
+  typology      String       // ΜΟΝΟΦΥΛΛΟ / ΔΙΦΥΛΛΟ / ΣΤΑΘΕΡΟ / ΠΑΝΤΖΟΥΡΙ / ...
+  openingWidth  Int          // mm
+  openingHeight Int          // mm
+  color         String?
+  glassSpec     String?
+  hasRoller     Boolean      @default(false)
+  hasScreen     Boolean      @default(false)
+  hasShutter    Boolean      @default(false)
+  notes         String?
+  version       Int          @default(1)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  cuttingResults CuttingResult[]
+
+  @@unique([projectId, unitCode])
+}
+
+model CuttingResult {
+  id           String   @id @default(cuid())
+  openingId    String
+  opening      Opening  @relation(fields: [openingId], references: [id])
+  resultJson   Json     // πλήρες CuttingResult από το cut engine (βλ. src/lib/cutting/*)
+  sourceRuleIds String[] // RULE_IDs που χρησιμοποιήθηκαν — audit trail
+  qcStatus     String   @default("PENDING") // PENDING / CONFIRMED / DISCREPANCY
+  qcResultJson Json?    // αποτέλεσμα ανεξάρτητου δεύτερου ελέγχου
+  calculatedBy String   // user id ή "CLAUDE"
+  createdAt    DateTime @default(now())
+}
+
+// ---------- Business Rules & Pricing Variables ----------
+
+enum RuleStatus {
+  VERIFIED
+  USER_VERIFIED
+  PENDING
+  SUPERSEDED
+}
+
+model BusinessRule {
+  id                 String     @id @default(cuid())
+  ruleId             String     // π.χ. "EUROPA_850_MONOFYLLO_CUT" — σταθερό αναγνωριστικό ανά family
+  category           String
+  system             String
+  typology           String
+  variables          String[]
+  formula            String
+  source             String
+  status             RuleStatus
+  version            Int
+  validFrom          DateTime
+  validTo            DateTime?
+  verificationState  String
+  updatedBy          String
+  updatedAt          DateTime   @updatedAt
+  createdAt          DateTime   @default(now())
+
+  @@unique([ruleId, version])
+  @@index([ruleId, status])
+}
+
+model PricingVariable {
+  id         String   @id @default(cuid())
+  key        String   // π.χ. "ROLLER_CATALOG_DISCOUNT_PERCENT"
+  value      Decimal  @db.Decimal(10, 4)
+  validFrom  DateTime
+  validTo    DateTime?
+  updatedBy  String
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@index([key, validFrom])
+}
+
+// ---------- Τιμοκατάλογοι / Ιστορικά snapshot ----------
+
+model PriceCatalogEntry {
+  id            String   @id @default(cuid())
+  sku           String
+  description   String
+  catalogPrice  Decimal  @db.Decimal(10, 2)
+  discountAllowed Boolean @default(true)
+  supplier      String?
+  source        String
+  validFrom     DateTime
+  validTo       DateTime?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@unique([sku, validFrom])
+  @@index([sku])
+}
+
+// Αμετάβλητο snapshot ό,τι χρησιμοποιήθηκε σε ΜΙΑ συγκεκριμένη κοστολόγηση —
+// ποτέ δεν ξαναγράφεται όταν αλλάζει ο τιμοκατάλογος/η έκπτωση αργότερα.
+model PriceSnapshot {
+  id                String   @id @default(cuid())
+  quoteId           String?
+  quote             Quote?   @relation(fields: [quoteId], references: [id])
+  sku               String
+  catalogPrice      Decimal  @db.Decimal(10, 2)
+  discountAllowed   Boolean
+  discountPercent   Decimal  @db.Decimal(5, 2)
+  discountAmount    Decimal  @db.Decimal(10, 2)
+  netPurchasePrice  Decimal  @db.Decimal(10, 2)
+  priceDate         DateTime
+  priceSource       String
+  createdAt         DateTime @default(now())
+}
+
+// ---------- Προσφορές / Παραγγελίες / Πληρωμές ----------
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model Quote {
+  id            String      @id @default(cuid())
+  projectId     String
+  project       Project     @relation(fields: [projectId], references: [id])
+  status        QuoteStatus @default(DRAFT)
+  customerTotal Decimal     @db.Decimal(10, 2)
+  internalCost  Decimal     @db.Decimal(10, 2)
+  marginPercent Decimal     @db.Decimal(5, 2)
+  vatPercent    Decimal     @db.Decimal(5, 2)
+  createdById   String
+  createdBy     User        @relation("QuoteCreatedBy", fields: [createdById], references: [id])
+  version       Int         @default(1)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  priceSnapshots PriceSnapshot[]
+}
+
+enum OrderCategory {
+  ΑΛΟΥΜΙΝΙΑ
+  ΤΖΑΜΙΑ
+  ΕΞΑΡΤΗΜΑΤΑ
+  ΣΙΤΕΣ
+  ΡΟΛΑ
+  ΑΝΑΛΩΣΙΜΑ
+}
+
+model Order {
+  id           String        @id @default(cuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id])
+  category     OrderCategory
+  supplier     String?
+  itemsJson    Json          // γραμμές παραγγελίας
+  status       String        @default("DRAFT")
+  createdById  String
+  createdBy    User          @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Payment {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id])
+  amount       Decimal  @db.Decimal(10, 2)
+  paidAt       DateTime
+  method       String?
+  notes        String?
+  recordedById String
+  recordedBy   User     @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+// ---------- Αποθήκη ----------
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  description String
+  unit        String   // τεμάχιο / μέτρο / m² / κιλό
+  quantityOnHand Decimal @db.Decimal(10, 2) @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model InventoryTransaction {
+  id            String   @id @default(cuid())
+  inventoryItemId String
+  delta         Decimal  @db.Decimal(10, 2) // + παραλαβή, − ανάλωση
+  reason        String
+  relatedProjectId String?
+  createdById   String
+  createdAt     DateTime @default(now())
+}
+
+// ---------- Έγγραφα / Φωτογραφίες ----------
+
+model ProjectDocument {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  kind      String   // ΦΩΤΟΓΡΑΦΙΑ / ΣΧΕΔΙΟ / ΕΓΓΡΑΦΟ
+  storageUrl String  // link προς object storage (S3-compatible) — όχι binary στη DB
+  uploadedById String
+  createdAt DateTime @default(now())
+}
+
+// ---------- Service ----------
+
+model ServiceTicket {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id])
+  issue        String
+  status       String   @default("OPEN")
+  assignedToId String?
+  assignedTo   User?    @relation("ServiceAssignedTo", fields: [assignedToId], references: [id])
+  resolvedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ---------- Audit Log ----------
+
+enum ActorType {
+  USER
+  AI
+  SYSTEM
+}
+
+model AuditLog {
+  id                String    @id @default(cuid())
+  actorType         ActorType
+  actorUserId       String?
+  actorUser         User?     @relation("AuditActorUser", fields: [actorUserId], references: [id])
+  actorLabel        String    // π.χ. "CLAUDE" όταν actorType=AI
+  action            String
+  before            Json?
+  after             Json?
+  source            String
+  relatedProjectId  String?
+  relatedCustomerId String?
+  at                DateTime  @default(now())
+
+  @@index([relatedProjectId])
+  @@index([relatedCustomerId])
+  @@index([at])
+}
+// ΤΣΙΑΝΤΗΣ ERP — Prisma schema
+//
+// Στόχος: πλήρες, multi-user, real-time-capable domain model για τη
+// WINDOWS-MARKT. PostgreSQL (βλ. docs/ARCHITECTURE.md για το γιατί).
+//
+// Concurrency: κάθε πίνακας που επεξεργάζονται πολλοί χρήστες/το Claude
+// ταυτόχρονα έχει `version Int @default(1)` (optimistic locking — κάθε
+// write ελέγχει WHERE version = X, ελαχιστοποιεί lost updates χωρίς
+// database-wide locks) + `updatedAt` timestamp. Transactions χρησιμοποιούνται
+// στο service layer (όχι εδώ) γύρω από πολυβηματικές αλλαγές.
+//
+// ΔΕΝ τρέχει ακόμα σε πραγματική βάση σε αυτό το sandbox (χρειάζεται
+// DATABASE_URL προς πραγματικό Postgres) — βλ. STATUS.md για το ένα
+// σημείο που χρειάζεται από τον Φίλιππο.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Users / Roles / Permissions ----------
+
+enum Role {
+  OWNER_ADMIN
+  SECRETARY
+  TECHNICIAN
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String
+  role               Role
+  active             Boolean   @default(true)
   permissionOverrides Json?    // { grant: string[], revoke: string[] } — βλ. src/lib/rbac/roles.ts
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
